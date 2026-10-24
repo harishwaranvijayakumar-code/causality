@@ -7,40 +7,28 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "development-only-secret-key-change-before-deployment",
 )
-
 DEBUG = os.getenv("DEBUG", "True").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
+    "1", "true", "yes", "on",
 }
 
 if not DEBUG and SECRET_KEY == (
     "development-only-secret-key-change-before-deployment"
 ):
-    raise RuntimeError(
-        "Set a secure SECRET_KEY when DEBUG is disabled."
-    )
+    raise RuntimeError("Set a secure SECRET_KEY when DEBUG is disabled.")
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
-        "ALLOWED_HOSTS",
-        "127.0.0.1,localhost",
+        "ALLOWED_HOSTS", "127.0.0.1,localhost"
     ).split(",")
     if host.strip()
 ]
-
-DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 20
-DATA_UPLOAD_MAX_NUMBER_FILES = 0
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -49,7 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "webapp.apps.WebappConfig",
+    "webapp",
 ]
 
 MIDDLEWARE = [
@@ -103,7 +91,6 @@ def get_database_config():
                 "DATABASE_URL must include a PostgreSQL host "
                 "and database name."
             )
-
         return {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
@@ -113,20 +100,16 @@ def get_database_config():
                 "HOST": parsed.hostname,
                 "PORT": parsed.port or 5432,
                 "CONN_MAX_AGE": 60,
-                "OPTIONS": {
-                    "connect_timeout": 5,
-                },
+                "OPTIONS": {"connect_timeout": 5},
             }
         }
 
     if parsed.scheme == "sqlite":
         database_path = unquote(parsed.path)
-
         if database_path in {"", "/"}:
             raise RuntimeError(
                 "DATABASE_URL must specify a SQLite database path."
             )
-
         return {
             "default": {
                 "ENGINE": "django.db.backends.sqlite3",
@@ -142,6 +125,11 @@ def get_database_config():
 
 DATABASES = get_database_config()
 
+# Support two JSON uploads plus multipart/form data overhead.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 20
+DATA_UPLOAD_MAX_NUMBER_FILES = 2
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": (
@@ -151,20 +139,17 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
+            "django.contrib.auth.password_validation.MinimumLengthValidator"
         ),
     },
     {
         "NAME": (
-            "django.contrib.auth.password_validation."
-            "CommonPasswordValidator"
+            "django.contrib.auth.password_validation.CommonPasswordValidator"
         ),
     },
     {
         "NAME": (
-            "django.contrib.auth.password_validation."
-            "NumericPasswordValidator"
+            "django.contrib.auth.password_validation.NumericPasswordValidator"
         ),
     },
 ]
@@ -174,9 +159,11 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "/static/"
+STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = []
+STATICFILES_STORAGE = (
+    "django.contrib.staticfiles.storage.StaticFilesStorage"
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
