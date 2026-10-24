@@ -85,6 +85,38 @@ class TraceComparisonWorkflowTests(TestCase):
         self.assertContains(response, "payment")
         self.assertContains(response, "Evidence is not proof")
 
+    def test_summary_displays_trace_counts_not_span_counts(self):
+        response = self.client.post(
+            self.url,
+            {
+                "baseline_json": json.dumps(self.baseline),
+                "degraded_json": json.dumps(self.degraded),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Baseline / degraded traces")
+        self.assertContains(response, "1 / 1")
+
+    def test_results_display_operation_sample_counts(self):
+        response = self.client.post(
+            self.url,
+            {
+                "baseline_json": json.dumps(self.baseline),
+                "degraded_json": json.dumps(self.degraded),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "1 / 1")
+
+        results = response.context["results"]
+        self.assertEqual(len(results), 2)
+
+        for item in results:
+            self.assertEqual(item["baseline_samples"], 1)
+            self.assertEqual(item["degraded_samples"], 1)
+
     def test_invalid_json_shows_validation_error(self):
         response = self.client.post(
             self.url,

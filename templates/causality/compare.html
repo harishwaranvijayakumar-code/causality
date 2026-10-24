@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -123,6 +124,11 @@
             background: #333;
         }
 
+        button:focus-visible {
+            outline: 2px solid #000;
+            outline-offset: 3px;
+        }
+
         .error-panel {
             margin: 24px 0;
             padding: 18px 20px;
@@ -143,6 +149,7 @@
             padding: 18px;
             background: var(--surface);
             border-radius: var(--radius);
+            min-width: 0;
         }
 
         .metric-value {
@@ -150,6 +157,7 @@
             font-size: 1.8rem;
             font-weight: 800;
             letter-spacing: -0.04em;
+            overflow-wrap: anywhere;
         }
 
         .metric-label {
@@ -196,7 +204,7 @@
         }
 
         .evidence p {
-            margin: 0;
+            margin: 0 0 8px;
             color: var(--muted);
             font-size: 0.88rem;
         }
@@ -207,6 +215,10 @@
             background: var(--surface);
             border-radius: var(--radius);
             color: #333;
+        }
+
+        .caveat p {
+            margin-bottom: 0;
         }
 
         .empty-state {
@@ -326,6 +338,7 @@
                         </span>
                         <span class="metric-label">Matched operations</span>
                     </div>
+
                     <div class="metric">
                         <span class="metric-value">
                             {{ regression_count }}
@@ -334,12 +347,13 @@
                             Operations with positive latency delta
                         </span>
                     </div>
+
                     <div class="metric">
                         <span class="metric-value">
-                            {{ baseline_span_count }} / {{ degraded_span_count }}
+                            {{ baseline_trace_count }} / {{ degraded_trace_count }}
                         </span>
                         <span class="metric-label">
-                            Baseline / degraded spans
+                            Baseline / degraded traces
                         </span>
                     </div>
                 </div>
@@ -421,8 +435,7 @@
     </main>
 
     <footer>
-        Causality · Experimental trace analysis · Evidence is not proof
-        of causation.
+        Causality &middot; Experimental trace analysis &middot; Evidence is not proof of causation.
     </footer>
 </body>
 </html>
