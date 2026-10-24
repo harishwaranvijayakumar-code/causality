@@ -30,6 +30,11 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Render supplies this value for deployed web services.
+render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -125,7 +130,7 @@ def get_database_config():
 
 DATABASES = get_database_config()
 
-# Support two JSON uploads plus multipart/form data overhead.
+# Support two JSON uploads plus multipart/form-data overhead.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 20
 DATA_UPLOAD_MAX_NUMBER_FILES = 2
@@ -161,14 +166,35 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = (
-    "django.contrib.staticfiles.storage.StaticFilesStorage"
-)
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
+
+    # Render terminates HTTPS at its proxy. Trust this header only
+    # when the application is deployed behind Render's managed proxy.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
+
+    # Enable HSTS only after confirming HTTPS works for the deployed
+    # hostname. Start with a short duration; increase it later.
+    SECURE_HSTS_SECONDS = int(
+        os.getenv("SECURE_HSTS_SECONDS", "0")
+    )
