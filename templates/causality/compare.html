@@ -1,6 +1,5 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,19 +7,81 @@
         name="description"
         content="Compare distributed trace datasets and investigate latency regressions using operation-level evidence."
     >
+    <meta name="color-scheme" content="light dark">
     <title>Causality | Trace comparison</title>
+
+    <script>
+        (() => {
+            try {
+                const savedTheme = localStorage.getItem("causality-theme");
+                const allowedThemes = ["light", "dark", "spectrum"];
+
+                if (allowedThemes.includes(savedTheme)) {
+                    document.documentElement.dataset.theme = savedTheme;
+                }
+            } catch (_) {
+                // The page remains usable if browser storage is unavailable.
+            }
+        })();
+    </script>
 
     <style>
         :root {
             color-scheme: light;
             --background: #ffffff;
             --surface: #f6f6f6;
-            --text: #000000;
+            --surface-raised: #ffffff;
+            --text: #111111;
             --muted: #606060;
             --border: #e2e2e2;
+            --accent: #111111;
+            --accent-text: #ffffff;
+            --accent-soft: #eeeeee;
             --danger: #a32020;
             --danger-background: #fff7f7;
-            --radius: 8px;
+            --success: #167344;
+            --warning: #8a5200;
+            --focus: #111111;
+            --radius: 9px;
+            --shadow: 0 2px 10px rgb(0 0 0 / 4%);
+        }
+
+        html[data-theme="dark"] {
+            color-scheme: dark;
+            --background: #080808;
+            --surface: #171717;
+            --surface-raised: #202020;
+            --text: #f5f5f5;
+            --muted: #b1b1b1;
+            --border: #363636;
+            --accent: #ffffff;
+            --accent-text: #111111;
+            --accent-soft: #303030;
+            --danger: #ff9696;
+            --danger-background: #301919;
+            --success: #72e6a6;
+            --warning: #ffd080;
+            --focus: #ffffff;
+            --shadow: none;
+        }
+
+        html[data-theme="spectrum"] {
+            color-scheme: light;
+            --background: #ffffff;
+            --surface: #f7f5ff;
+            --surface-raised: #ffffff;
+            --text: #171329;
+            --muted: #5e5872;
+            --border: #e3ddf4;
+            --accent: #6041d8;
+            --accent-text: #ffffff;
+            --accent-soft: #eee8ff;
+            --danger: #bd2449;
+            --danger-background: #fff0f4;
+            --success: #087f5b;
+            --warning: #965500;
+            --focus: #6941df;
+            --shadow: 0 3px 14px rgb(66 42 130 / 7%);
         }
 
         * {
@@ -29,6 +90,7 @@
 
         html {
             scroll-behavior: smooth;
+            scroll-padding-top: 24px;
         }
 
         body {
@@ -36,20 +98,76 @@
             background: var(--background);
             color: var(--text);
             font-family: Arial, Helvetica, sans-serif;
-            line-height: 1.5;
+            line-height: 1.55;
+            transition: background-color 160ms ease, color 160ms ease;
+        }
+
+        button,
+        textarea {
+            font: inherit;
         }
 
         header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 18px;
+            padding: 18px 5%;
             border-bottom: 1px solid var(--border);
-            padding: 20px 5%;
+            background: var(--background);
         }
 
         .brand {
             color: var(--text);
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             font-weight: 800;
-            letter-spacing: -0.04em;
+            letter-spacing: -0.055em;
             text-decoration: none;
+        }
+
+        .theme-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .theme-label {
+            margin-right: 5px;
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .theme-button {
+            min-height: 38px;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface-raised);
+            color: var(--text);
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .theme-button[aria-pressed="true"] {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--accent-text);
+        }
+
+        html[data-theme="spectrum"] .theme-button[data-theme-choice="spectrum"][aria-pressed="true"] {
+            border-color: transparent;
+            background: linear-gradient(
+                110deg,
+                #e5488a 0%,
+                #9a4de0 35%,
+                #4868ed 65%,
+                #168eac 100%
+            );
+            color: #ffffff;
         }
 
         main {
@@ -60,15 +178,15 @@
         h1 {
             max-width: 760px;
             margin: 0 0 16px;
-            font-size: clamp(2.2rem, 5vw, 4.2rem);
+            font-size: clamp(2.25rem, 5vw, 4.3rem);
             line-height: 1.04;
-            letter-spacing: -0.055em;
+            letter-spacing: -0.06em;
         }
 
         h2 {
             margin: 0 0 12px;
-            font-size: 1.35rem;
-            letter-spacing: -0.025em;
+            font-size: 1.4rem;
+            letter-spacing: -0.03em;
         }
 
         h3 {
@@ -103,6 +221,8 @@
             padding: 22px;
             border: 1px solid var(--border);
             border-radius: var(--radius);
+            background: var(--surface-raised);
+            box-shadow: var(--shadow);
         }
 
         label {
@@ -117,18 +237,18 @@
             min-height: 360px;
             padding: 14px;
             resize: vertical;
-            border: 1px solid #bdbdbd;
-            border-radius: 5px;
-            background: #ffffff;
-            color: #111111;
-            font: 13px/1.55 Consolas, "Courier New", monospace;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            font: 13px/1.6 Consolas, "Courier New", monospace;
             tab-size: 4;
         }
 
         textarea:focus-visible,
         button:focus-visible,
         a:focus-visible {
-            outline: 2px solid #000000;
+            outline: 3px solid var(--focus);
             outline-offset: 3px;
         }
 
@@ -136,6 +256,20 @@
             margin: 8px 0 0;
             color: var(--muted);
             font-size: 0.9rem;
+        }
+
+        .privacy-note {
+            margin: 20px 0 0;
+            padding: 16px 18px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+        }
+
+        .privacy-note p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
         }
 
         .actions {
@@ -146,31 +280,49 @@
             margin-top: 20px;
         }
 
-        button {
+        .primary-button {
             min-height: 48px;
-            padding: 14px 22px;
-            border: 0;
-            border-radius: 5px;
-            background: #000000;
-            color: #ffffff;
-            font: inherit;
+            padding: 13px 22px;
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            background: var(--accent);
+            color: var(--accent-text);
             font-weight: 700;
             cursor: pointer;
         }
 
-        button:hover {
-            background: #333333;
+        .primary-button:hover:not(:disabled) {
+            filter: brightness(0.88);
         }
 
-        button:disabled {
-            cursor: not-allowed;
-            opacity: 0.65;
+        html[data-theme="spectrum"] .primary-button {
+            border-color: transparent;
+            background: linear-gradient(
+                110deg,
+                #dd3d86 0%,
+                #8c45db 42%,
+                #405fe0 72%,
+                #168ba8 100%
+            );
+            color: #ffffff;
+        }
+
+        .primary-button:disabled {
+            cursor: wait;
+            opacity: 0.72;
+        }
+
+        .submit-status {
+            min-height: 1.5em;
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.9rem;
         }
 
         .error-panel {
             margin: 24px 0;
             padding: 18px 20px;
-            border: 1px solid #e4b7b7;
+            border: 1px solid var(--danger);
             border-radius: var(--radius);
             background: var(--danger-background);
             color: var(--danger);
@@ -204,6 +356,7 @@
         .metric {
             min-width: 0;
             padding: 18px;
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--surface);
         }
@@ -211,14 +364,50 @@
         .metric-value {
             display: block;
             overflow-wrap: anywhere;
-            font-size: 1.8rem;
+            font-size: 1.9rem;
             font-weight: 800;
-            letter-spacing: -0.04em;
+            letter-spacing: -0.045em;
         }
 
         .metric-label {
             color: var(--muted);
             font-size: 0.9rem;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(1) {
+            border-top: 3px solid #9b57db;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(1) .metric-value {
+            color: #7440c6;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(2) {
+            border-top: 3px solid #e24a81;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(2) .metric-value {
+            color: #c52d65;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(3) {
+            border-top: 3px solid #2588c9;
+        }
+
+        html[data-theme="spectrum"] .metric:nth-child(3) .metric-value {
+            color: #176eae;
+        }
+
+        html[data-theme="dark"] .metric:nth-child(1) .metric-value {
+            color: #f5f5f5;
+        }
+
+        html[data-theme="dark"] .metric:nth-child(2) .metric-value {
+            color: #ff9696;
+        }
+
+        html[data-theme="dark"] .metric:nth-child(3) .metric-value {
+            color: #a8c8ff;
         }
 
         .saved-record {
@@ -232,8 +421,8 @@
         }
 
         .table-wrap {
-            overflow-x: auto;
             max-width: 100%;
+            overflow-x: auto;
         }
 
         table {
@@ -273,6 +462,7 @@
         .operation-name {
             display: block;
             margin-top: 3px;
+            color: var(--muted);
         }
 
         .numeric {
@@ -282,6 +472,14 @@
 
         .delta {
             font-weight: 800;
+        }
+
+        html[data-theme="spectrum"] .delta {
+            color: #bd2b63;
+        }
+
+        html[data-theme="dark"] .delta {
+            color: #ffaaaa;
         }
 
         .evidence {
@@ -304,10 +502,19 @@
             margin-bottom: 0;
         }
 
+        html[data-theme="spectrum"] .evidence strong {
+            color: #6941bf;
+        }
+
+        html[data-theme="dark"] .evidence strong {
+            color: #e1d2ff;
+        }
+
         .empty-state {
             padding: 28px;
-            border: 1px dashed #bdbdbd;
+            border: 1px dashed var(--border);
             border-radius: var(--radius);
+            background: var(--surface);
         }
 
         .empty-state p {
@@ -318,13 +525,24 @@
         .caveat {
             margin-top: 24px;
             padding: 18px;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
             border-radius: var(--radius);
             background: var(--surface);
-            color: #333333;
+            color: var(--text);
         }
 
         .caveat p {
             margin: 8px 0 0;
+            color: var(--muted);
+        }
+
+        html[data-theme="spectrum"] .caveat {
+            border-left-color: #8c45db;
+        }
+
+        html[data-theme="dark"] .caveat {
+            border-left-color: #f5f5f5;
         }
 
         footer {
@@ -335,6 +553,18 @@
         }
 
         @media (max-width: 760px) {
+            header {
+                align-items: flex-start;
+            }
+
+            .theme-controls {
+                width: 100%;
+            }
+
+            .theme-label {
+                width: 100%;
+            }
+
             main {
                 margin-top: 32px;
                 margin-bottom: 56px;
@@ -360,11 +590,20 @@
             .results-section {
                 margin-top: 40px;
             }
+
+            th,
+            td {
+                padding: 11px 10px;
+            }
         }
 
         @media (prefers-reduced-motion: reduce) {
             html {
                 scroll-behavior: auto;
+            }
+
+            body {
+                transition: none;
             }
         }
     </style>
@@ -373,6 +612,37 @@
 <body>
     <header>
         <a class="brand" href="{% url 'webapp:compare' %}">causality</a>
+
+        <nav class="theme-controls" aria-label="Appearance">
+            <span class="theme-label">Appearance</span>
+
+            <button
+                class="theme-button"
+                type="button"
+                data-theme-choice="light"
+                aria-pressed="true"
+            >
+                Light
+            </button>
+
+            <button
+                class="theme-button"
+                type="button"
+                data-theme-choice="dark"
+                aria-pressed="false"
+            >
+                Dark
+            </button>
+
+            <button
+                class="theme-button"
+                type="button"
+                data-theme-choice="spectrum"
+                aria-pressed="false"
+            >
+                Spectrum
+            </button>
+        </nav>
     </header>
 
     <main>
@@ -399,7 +669,11 @@
             </p>
 
             {% if errors %}
-                <div class="error-panel" role="alert" aria-labelledby="error-heading">
+                <div
+                    class="error-panel"
+                    role="alert"
+                    aria-labelledby="error-heading"
+                >
                     <strong id="error-heading">
                         Unable to analyze these datasets.
                     </strong>
@@ -411,14 +685,23 @@
                 </div>
             {% endif %}
 
-            <form method="post" action="{% url 'webapp:compare' %}">
+            <form
+                id="comparison-form"
+                method="post"
+                action="{% url 'webapp:compare' %}"
+            >
                 {% csrf_token %}
 
                 <div class="dataset-grid">
-                    <section class="dataset-panel" aria-labelledby="baseline-heading">
+                    <section
+                        class="dataset-panel"
+                        aria-labelledby="baseline-heading"
+                    >
                         <h3 id="baseline-heading">Baseline</h3>
 
-                        <label for="baseline_json">Baseline dataset JSON</label>
+                        <label for="baseline_json">
+                            Baseline dataset JSON
+                        </label>
 
                         <textarea
                             id="baseline_json"
@@ -426,19 +709,25 @@
                             spellcheck="false"
                             autocomplete="off"
                             autocapitalize="off"
+                            aria-describedby="baseline-help"
                             required
                         >{{ baseline_json }}</textarea>
 
-                        <p class="help">
+                        <p id="baseline-help" class="help">
                             The reference dataset representing normal
                             or expected performance.
                         </p>
                     </section>
 
-                    <section class="dataset-panel" aria-labelledby="degraded-heading">
+                    <section
+                        class="dataset-panel"
+                        aria-labelledby="degraded-heading"
+                    >
                         <h3 id="degraded-heading">Degraded</h3>
 
-                        <label for="degraded_json">Degraded dataset JSON</label>
+                        <label for="degraded_json">
+                            Degraded dataset JSON
+                        </label>
 
                         <textarea
                             id="degraded_json"
@@ -446,18 +735,43 @@
                             spellcheck="false"
                             autocomplete="off"
                             autocapitalize="off"
+                            aria-describedby="degraded-help"
                             required
                         >{{ degraded_json }}</textarea>
 
-                        <p class="help">
+                        <p id="degraded-help" class="help">
                             The dataset collected during the slowdown
-                            or performance regression.
+                            or suspected performance regression.
                         </p>
                     </section>
                 </div>
 
+                <aside class="privacy-note" aria-labelledby="privacy-heading">
+                    <strong id="privacy-heading">Before you submit</strong>
+                    <p>
+                        Successful comparisons save both submitted datasets
+                        and their analysis results in the configured database.
+                        Trace data can contain sensitive information. Remove
+                        secrets, personal data, and confidential attributes
+                        before submitting.
+                    </p>
+                </aside>
+
                 <div class="actions">
-                    <button type="submit">Compare datasets</button>
+                    <button
+                        id="compare-button"
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Compare datasets
+                    </button>
+
+                    <p
+                        id="submit-status"
+                        class="submit-status"
+                        role="status"
+                        aria-live="polite"
+                    ></p>
                 </div>
             </form>
         </section>
@@ -485,19 +799,25 @@
 
                 <div class="summary-grid">
                     <div class="metric">
-                        <span class="metric-value">{{ matched_operation_count }}</span>
+                        <span class="metric-value">
+                            {{ matched_operation_count }}
+                        </span>
                         <span class="metric-label">Matched operations</span>
                     </div>
 
                     <div class="metric">
-                        <span class="metric-value">{{ regression_count }}</span>
+                        <span class="metric-value">
+                            {{ regression_count }}
+                        </span>
                         <span class="metric-label">
                             Operations with positive latency delta
                         </span>
                     </div>
 
                     <div class="metric">
-                        <span class="metric-value">{{ baseline_trace_count }} / {{ degraded_trace_count }}</span>
+                        <span class="metric-value">
+                            {{ baseline_trace_count }} / {{ degraded_trace_count }}
+                        </span>
                         <span class="metric-label">
                             Baseline / degraded traces
                         </span>
@@ -528,25 +848,43 @@
                                 <tbody>
                                     {% for item in results %}
                                         <tr>
-                                            <td class="rank">{{ forloop.counter }}</td>
-
-                                            <td>
-                                                <strong>{{ item.service_name }}</strong>
-                                                <span class="operation-name">{{ item.operation_name }}</span>
+                                            <td class="rank">
+                                                {{ forloop.counter }}
                                             </td>
 
-                                            <td class="numeric">{{ item.baseline_median_ms|floatformat:3 }} ms</td>
+                                            <td>
+                                                <strong>
+                                                    {{ item.service_name }}
+                                                </strong>
+                                                <span class="operation-name">
+                                                    {{ item.operation_name }}
+                                                </span>
+                                            </td>
 
-                                            <td class="numeric">{{ item.degraded_median_ms|floatformat:3 }} ms</td>
+                                            <td class="numeric">
+                                                {{ item.baseline_median_ms|floatformat:3 }} ms
+                                            </td>
 
-                                            <td class="numeric delta">{% if item.delta_ns > 0 %}+{% endif %}{{ item.delta_ms|floatformat:3 }} ms</td>
+                                            <td class="numeric">
+                                                {{ item.degraded_median_ms|floatformat:3 }} ms
+                                            </td>
 
-                                            <td class="numeric">{{ item.baseline_samples }} / {{ item.degraded_samples }}</td>
+                                            <td class="numeric delta">
+                                                {% if item.delta_ns > 0 %}+{% endif %}{{ item.delta_ms|floatformat:3 }} ms
+                                            </td>
+
+                                            <td class="numeric">
+                                                {{ item.baseline_samples }} / {{ item.degraded_samples }}
+                                            </td>
 
                                             <td class="evidence">
-                                                <strong>{{ item.evidence_label }}</strong>
+                                                <strong>
+                                                    {{ item.evidence_label }}
+                                                </strong>
 
-                                                <p>{{ item.evidence_description }}</p>
+                                                <p>
+                                                    {{ item.evidence_description }}
+                                                </p>
 
                                                 <p>
                                                     Descendant regression evidence:
@@ -590,5 +928,59 @@
         Causality &middot; Experimental trace analysis &middot;
         Evidence is not proof of causation.
     </footer>
+
+    <script>
+        (() => {
+            const root = document.documentElement;
+            const themeButtons = document.querySelectorAll("[data-theme-choice]");
+            const form = document.getElementById("comparison-form");
+            const compareButton = document.getElementById("compare-button");
+            const status = document.getElementById("submit-status");
+
+            const allowedThemes = ["light", "dark", "spectrum"];
+
+            function applyTheme(theme, save = true) {
+                if (!allowedThemes.includes(theme)) {
+                    return;
+                }
+
+                root.dataset.theme = theme;
+
+                themeButtons.forEach((button) => {
+                    const selected = button.dataset.themeChoice === theme;
+                    button.setAttribute("aria-pressed", String(selected));
+                });
+
+                if (save) {
+                    try {
+                        localStorage.setItem("causality-theme", theme);
+                    } catch (_) {
+                        // Theme switching still works for this page view.
+                    }
+                }
+            }
+
+            applyTheme(root.dataset.theme || "light", false);
+
+            themeButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    applyTheme(button.dataset.themeChoice);
+                });
+            });
+
+            if (form && compareButton && status) {
+                form.addEventListener("submit", () => {
+                    if (compareButton.disabled) {
+                        return;
+                    }
+
+                    compareButton.disabled = true;
+                    compareButton.textContent = "Comparing datasets...";
+                    status.textContent =
+                        "Your datasets are being validated and analyzed. Please wait.";
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
