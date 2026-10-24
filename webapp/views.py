@@ -2,6 +2,7 @@
 import json
 
 from django.core.exceptions import RequestDataTooBig
+from django.db import DatabaseError
 from django.shortcuts import render
 
 from causality.evidence_reporting import attach_evidence_reporting
@@ -9,6 +10,7 @@ from causality.trace_analysis import (
     parse_traces,
     rank_execution_aware_regressions,
 )
+from webapp.models import ComparisonRun
 
 
 MAX_DATASET_BYTES = 1_048_576
@@ -92,6 +94,10 @@ def _parse_dataset(raw_json: str, label: str):
         ) from exc
 
 
+def _count_traces(spans):
+    return len({span.trace_id for span in spans})
+
+
 def compare_traces(request):
     context = {
         "baseline_json": json.dumps(EXAMPLE_BASELINE, indent=2),
@@ -103,6 +109,7 @@ def compare_traces(request):
         "degraded_trace_count": 0,
         "matched_operation_count": 0,
         "regression_count": 0,
+        "saved_comparison_id": None,
     }
 
     if request.method != "POST":
@@ -170,22 +177,41 @@ def compare_traces(request):
         )
         results.append(result)
 
+    baseline_trace_count = _count_traces(baseline_spans)
+    degraded_trace_count = _count_traces(degraded_spans)
+    matched_operation_count = len(results)
+    regression_count = sum(
+        1
+        for item in results
+        if item["is_regression_candidate"]
+    )
+
+    try:
+        saved_run = ComparisonRun.objects.create(
+            baseline_trace_count=baseline_trace_count,
+            degraded_trace_count=degraded_trace_count,
+            matched_operation_count=matched_operation_count,
+            regression_count=regression_count,
+            baseline_dataset=json.loads(baseline_json),
+            degraded_dataset=json.loads(degraded_json),
+            results=results,
+        )
+    except (DatabaseError, ValueError, TypeError):
+        context["errors"].append(
+            "The comparison was analyzed but could not be saved. "
+            "Check the database configuration and try again."
+        )
+        return render(request, "causality/compare.html", context)
+
     context.update(
         {
             "results": results,
             "analysis_completed": True,
-            "baseline_trace_count": len(
-                {span.trace_id for span in baseline_spans}
-            ),
-            "degraded_trace_count": len(
-                {span.trace_id for span in degraded_spans}
-            ),
-            "matched_operation_count": len(results),
-            "regression_count": sum(
-                1
-                for item in results
-                if item["is_regression_candidate"]
-            ),
+            "baseline_trace_count": baseline_trace_count,
+            "degraded_trace_count": degraded_trace_count,
+            "matched_operation_count": matched_operation_count,
+            "regression_count": regression_count,
+            "saved_comparison_id": saved_run.pk,
         }
     )
 
