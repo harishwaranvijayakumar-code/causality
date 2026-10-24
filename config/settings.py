@@ -4,6 +4,7 @@ from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "webapp.apps.WebappConfig",
 ]
 
 MIDDLEWARE = [
@@ -160,6 +162,18 @@ AUTH_PASSWORD_VALIDATORS = [
             "NumericPasswordValidator"
         ),
     },
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
+    },
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
+    },
 ]
 
 LANGUAGE_CODE = "en-us"
@@ -167,11 +181,9 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = (
-    "django.contrib.staticfiles.storage.StaticFilesStorage"
-)
+STATICFILES_DIRS = []
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
