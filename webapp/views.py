@@ -1,3 +1,4 @@
+
 import json
 
 from django.shortcuts import render
@@ -9,89 +10,98 @@ from causality.trace_analysis import (
 )
 
 
-EXAMPLE_BASELINE = json.dumps(
-    {
-        "traces": [
-            {
-                "trace_id": "baseline-1",
-                "spans": [
-                    {
-                        "span_id": "root-1",
-                        "parent_span_id": None,
-                        "service_name": "checkout",
-                        "operation_name": "POST /checkout",
-                        "start_time_ns": 0,
-                        "end_time_ns": 300_000_000,
-                    },
-                    {
-                        "span_id": "payment-1",
-                        "parent_span_id": "root-1",
-                        "service_name": "payment",
-                        "operation_name": "charge",
-                        "start_time_ns": 100_000_000,
-                        "end_time_ns": 200_000_000,
-                    },
-                ],
-            }
-        ]
-    },
-    indent=2,
-)
+MAX_DATASET_BYTES = 1_048_576
 
-EXAMPLE_DEGRADED = json.dumps(
-    {
-        "traces": [
-            {
-                "trace_id": "degraded-1",
-                "spans": [
-                    {
-                        "span_id": "root-1",
-                        "parent_span_id": None,
-                        "service_name": "checkout",
-                        "operation_name": "POST /checkout",
-                        "start_time_ns": 0,
-                        "end_time_ns": 800_000_000,
-                    },
-                    {
-                        "span_id": "payment-1",
-                        "parent_span_id": "root-1",
-                        "service_name": "payment",
-                        "operation_name": "charge",
-                        "start_time_ns": 100_000_000,
-                        "end_time_ns": 700_000_000,
-                    },
-                ],
-            }
-        ]
-    },
-    indent=2,
-)
+EXAMPLE_BASELINE = {
+    "traces": [
+        {
+            "trace_id": "baseline-1",
+            "spans": [
+                {
+                    "span_id": "root",
+                    "parent_span_id": None,
+                    "service_name": "checkout",
+                    "operation_name": "POST /checkout",
+                    "start_time_ns": 0,
+                    "end_time_ns": 300_000_000,
+                },
+                {
+                    "span_id": "payment",
+                    "parent_span_id": "root",
+                    "service_name": "payment",
+                    "operation_name": "authorize",
+                    "start_time_ns": 50_000_000,
+                    "end_time_ns": 100_000_000,
+                },
+            ],
+        }
+    ]
+}
+
+EXAMPLE_DEGRADED = {
+    "traces": [
+        {
+            "trace_id": "degraded-1",
+            "spans": [
+                {
+                    "span_id": "root",
+                    "parent_span_id": None,
+                    "service_name": "checkout",
+                    "operation_name": "POST /checkout",
+                    "start_time_ns": 0,
+                    "end_time_ns": 800_000_000,
+                },
+                {
+                    "span_id": "payment",
+                    "parent_span_id": "root",
+                    "service_name": "payment",
+                    "operation_name": "authorize",
+                    "start_time_ns": 50_000_000,
+                    "end_time_ns": 600_000_000,
+                },
+            ],
+        }
+    ]
+}
 
 
 def _parse_dataset(raw_json: str, label: str):
+    if len(raw_json.encode("utf-8")) > MAX_DATASET_BYTES:
+        raise ValueError(
+            f"{label}: dataset exceeds the 1 MiB size limit."
+        )
+
+    if not raw_json.strip():
+        raise ValueError(f"{label}: provide a JSON dataset.")
+
     try:
         data = json.loads(raw_json)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
         raise ValueError(
-            f"{label}: invalid JSON at line {exc.lineno}, "
-            f"column {exc.colno}."
+            f"{label}: invalid JSON; it may be invalid or excessively nested JSON."
         ) from exc
 
     try:
-        spans = parse_traces(data)
+        return parse_traces(data)
     except ValueError as exc:
         raise ValueError(f"{label}: {exc}") from exc
-
-    return spans
+    except RecursionError as exc:
+        raise ValueError(
+            f"{label}: dataset is excessively nested."
+        ) from exc
 
 
 def compare_traces(request):
     context = {
-        "baseline_json": EXAMPLE_BASELINE,
-        "degraded_json": EXAMPLE_DEGRADED,
-        "analysis_completed": False,
-        "results": [],
+        "baseline_json": json.dumps(EXAMPLE_BASELINE, indent=2),
+        "degraded_json": json.dumps(EXAMPLE_DEGRADED, indent=2),
         "errors": [],
+        "results": [],
+        "analysis_completed": False,
+        "baseline_trace_count": 0,
+        "degraded_trace_count": 0,
+        "matched_operation_count": 0,
+        "regression_count": 0,
     }
 
     if request.method != "POST":
@@ -116,11 +126,18 @@ def compare_traces(request):
         context["errors"].append(str(exc))
         return render(request, "causality/compare.html", context)
 
-    ranked = rank_execution_aware_regressions(
-        baseline_spans,
-        degraded_spans,
-    )
-    reported = attach_evidence_reporting(ranked)
+    try:
+        ranked = rank_execution_aware_regressions(
+            baseline_spans,
+            degraded_spans,
+        )
+        reported = attach_evidence_reporting(ranked)
+    except (ValueError, TypeError, KeyError):
+        context["errors"].append(
+            "The datasets could not be analyzed. "
+            "Check their structure and try again."
+        )
+        return render(request, "causality/compare.html", context)
 
     results = []
 
@@ -142,13 +159,19 @@ def compare_traces(request):
 
     context.update(
         {
-            "analysis_completed": True,
             "results": results,
-            "baseline_span_count": len(baseline_spans),
-            "degraded_span_count": len(degraded_spans),
+            "analysis_completed": True,
+            "baseline_trace_count": len(
+                {span.trace_id for span in baseline_spans}
+            ),
+            "degraded_trace_count": len(
+                {span.trace_id for span in degraded_spans}
+            ),
             "matched_operation_count": len(results),
             "regression_count": sum(
-                item["delta_ns"] > 0 for item in results
+                1
+                for item in results
+                if item["is_regression_candidate"]
             ),
         }
     )
