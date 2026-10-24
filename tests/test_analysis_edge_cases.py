@@ -53,16 +53,10 @@ def parsed(dataset: dict):
 
 def test_no_matching_operations_returns_empty_results():
     baseline = parsed(
-        make_dataset(
-            100,
-            root_operation="old_request",
-        )
+        make_dataset(100, root_operation="old_request")
     )
     degraded = parsed(
-        make_dataset(
-            200,
-            root_operation="new_request",
-        )
+        make_dataset(200, root_operation="new_request")
     )
 
     results = rank_latency_regressions(baseline, degraded)
@@ -155,5 +149,95 @@ def test_parent_without_descendant_regression_keeps_its_increase():
 
     assert parent["delta_ns"] == 500
     assert parent["descendant_regression_evidence_ns"] == 0
+    assert parent["discounted_as_parent_symptom"] is False
+    assert parent["adjusted_delta_ns"] == 500
+
+
+def test_parallel_child_regressions_are_not_added_together():
+    baseline = {
+        "traces": [
+            {
+                "trace_id": "baseline-1",
+                "spans": [
+                    {
+                        "span_id": "root",
+                        "parent_span_id": None,
+                        "service_name": "checkout",
+                        "operation_name": "request",
+                        "start_time_ns": 0,
+                        "end_time_ns": 100,
+                    },
+                    {
+                        "span_id": "payment",
+                        "parent_span_id": "root",
+                        "service_name": "payment",
+                        "operation_name": "authorize",
+                        "start_time_ns": 0,
+                        "end_time_ns": 10,
+                    },
+                    {
+                        "span_id": "inventory",
+                        "parent_span_id": "root",
+                        "service_name": "inventory",
+                        "operation_name": "reserve",
+                        "start_time_ns": 0,
+                        "end_time_ns": 10,
+                    },
+                ],
+            }
+        ]
+    }
+
+    degraded = {
+        "traces": [
+            {
+                "trace_id": "degraded-1",
+                "spans": [
+                    {
+                        "span_id": "root",
+                        "parent_span_id": None,
+                        "service_name": "checkout",
+                        "operation_name": "request",
+                        "start_time_ns": 0,
+                        "end_time_ns": 600,
+                    },
+                    {
+                        "span_id": "payment",
+                        "parent_span_id": "root",
+                        "service_name": "payment",
+                        "operation_name": "authorize",
+                        "start_time_ns": 0,
+                        "end_time_ns": 310,
+                    },
+                    {
+                        "span_id": "inventory",
+                        "parent_span_id": "root",
+                        "service_name": "inventory",
+                        "operation_name": "reserve",
+                        "start_time_ns": 0,
+                        "end_time_ns": 310,
+                    },
+                ],
+            }
+        ]
+    }
+
+    results = rank_execution_aware_regressions(
+        parsed(baseline),
+        parsed(degraded),
+    )
+
+    by_operation = {
+        (item["service_name"], item["operation_name"]): item
+        for item in results
+    }
+
+    parent = by_operation[("checkout", "request")]
+
+    assert parent["delta_ns"] == 500
+
+    # Each child increased by 300 ns. Their increases overlap,
+    # so the heuristic must not sum them to 600 ns.
+    assert parent["descendant_regression_evidence_ns"] == 300
     assert parent["discounted_as_parent_symptom"] is False
     assert parent["adjusted_delta_ns"] == 500
