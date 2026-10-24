@@ -1,30 +1,38 @@
+
 # Causality
 
 Causality is an experimental tool for investigating latency regressions in distributed traces. It compares baseline and degraded trace datasets, ranks operation-level latency changes, and presents evidence that may help engineers investigate potential contributors.
 
 ## Current status
 
-The core trace-analysis and synthetic-experiment modules exist, and the current test suite contains 79 passing tests. The Django foundation is being established.
+The project includes:
+- A trace-analysis package that operates independently of Django.
+- Execution-aware regression ranking and evidence reporting.
+- A Django web workflow for comparing baseline and degraded JSON datasets.
+- Input validation and dataset-size limits.
+- Automated tests for analysis behavior, edge cases, and the web workflow.
+- Synthetic experiments and benchmark scripts.
 
-The product does not yet have a completed upload-to-results web workflow.
+The latest recorded verification completed with 97 passing tests. Re-run the commands in the Testing section to verify the current checkout.
 
 ## Technology
 
 - Python
 - Django
-- PostgreSQL support, with SQLite available for local development
+- PostgreSQL support, with SQLite for local development
 - Django templates and static files
 - Gunicorn and WhiteNoise
+- `python-dotenv`
 - pytest and pytest-django
 
 ## Prerequisites
 
-- Python compatible with the pinned dependencies
+- A Python version compatible with the pinned dependencies
 - Git
 
 ## Local setup
 
-Create and activate a virtual environment, then install the dependencies:
+Create and activate a virtual environment, then install dependencies:
 
 ```powershell
 python -m venv .venv
@@ -32,19 +40,19 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Create your local environment file:
+Create a local environment file:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-For local development, the default settings use SQLite. Keep `DEBUG=True` only for local development.
+The default local configuration uses SQLite. Keep `DEBUG=True` only for local development. Do not commit `.env` or production secrets.
 
-Run Django checks and database migrations:
+Apply database migrations and check the configuration:
 
 ```powershell
-python manage.py check
 python manage.py migrate
+python manage.py check
 ```
 
 Start the development server:
@@ -53,11 +61,25 @@ Start the development server:
 python manage.py runserver
 ```
 
-Visit `http://127.0.0.1:8000/health/` to verify the health endpoint.
+Open `http://127.0.0.1:8000/` to use the trace comparison workflow.
 
-## Tests
+The health endpoint is available at `http://127.0.0.1:8000/health/`.
 
-Run the full test suite:
+## Using the comparison workflow
+
+1. Open the home page.
+2. Provide a baseline trace dataset as JSON.
+3. Provide a degraded trace dataset using the supported trace structure.
+4. Submit the comparison.
+5. Review matched operations, latency changes, and the evidence classifications.
+
+The form includes example datasets. Each dataset is limited to 1 MiB, and malformed or unsupported input should be corrected before retrying.
+
+The analysis is performed for the request. Datasets and results are not currently persisted between requests.
+
+## Tests and checks
+
+Run the complete test suite:
 
 ```powershell
 python -m pytest -q
@@ -69,9 +91,27 @@ Run Django's system checks:
 python manage.py check
 ```
 
+Check installed dependency consistency:
+
+```powershell
+python -m pip check
+```
+
+Check the current Git diff for whitespace errors:
+
+```powershell
+git diff --check
+```
+
+Collect static files when preparing a deployment:
+
+```powershell
+python manage.py collectstatic --noinput
+```
+
 ## Experimental scripts
 
-The existing analysis and benchmark scripts remain separate from the web configuration:
+The analysis and benchmark scripts remain separate from Django views and templates:
 
 ```powershell
 python run_experiments.py
@@ -87,16 +127,26 @@ python run_evidence_report.py
 | `SECRET_KEY` | Django signing and security secret |
 | `DEBUG` | Enables or disables Django debug mode |
 | `ALLOWED_HOSTS` | Comma-separated allowed hostnames |
-| `DATABASE_URL` | Optional database connection URL |
+| `DATABASE_URL` | Optional SQLite or PostgreSQL connection URL |
 
-Never commit `.env` or production secrets.
+Production deployments must set a secure `SECRET_KEY`, set `DEBUG=False`, configure `ALLOWED_HOSTS`, and provide an appropriate database configuration.
+
+## Architecture
+
+- `causality/` contains domain analysis and evidence logic.
+- `webapp/` contains Django request handling.
+- `templates/` contains the HTML interface.
+- `tests/` contains automated tests.
+- Experimental scripts remain outside the web request workflow.
 
 ## Interpretation and limitations
 
-The current ranking methods use synthetic experiments and operation-level latency evidence. Correlation and trace evidence do not establish causality. Synthetic benchmark results are not proof of production accuracy.
+The ranking methods use operation-level latency changes and descendant-span evidence. These signals can help prioritize investigation, but correlation and trace evidence do not prove causation.
 
-## Development notes
+Synthetic benchmark results are not proof of production accuracy. The tool should be treated as an investigation aid, not an automatic root-cause oracle.
 
-The analysis package and its existing tests should remain independent of Django views and templates. Add web functionality incrementally and verify it with automated tests.
+## Development decisions and deviations
 
-GitHub Actions CI and an additional linting tool are not currently configured. These remain explicit deviations from the general development checklist rather than completed tasks.
+The current implementation intentionally avoids queues, background workers, and persistent analysis records because the core comparison workflow does not currently require them.
+
+GitHub Actions CI and an additional linting tool are not configured. These remain explicit deviations from the general development checklist, not completed tasks.

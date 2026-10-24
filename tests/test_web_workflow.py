@@ -1,6 +1,7 @@
+
 import json
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 
@@ -133,3 +134,28 @@ class TraceComparisonWorkflowTests(TestCase):
         self.assertTrue(response.context["analysis_completed"])
         self.assertEqual(response.context["matched_operation_count"], 0)
         self.assertContains(response, "No matched operations found.")
+
+    @override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=1024)
+    def test_oversized_request_returns_controlled_error(self):
+        response = self.client.post(
+            self.url,
+            {
+                "baseline_json": json.dumps(
+                    {"traces": [], "padding": "x" * 2048}
+                ),
+                "degraded_json": json.dumps(self.degraded),
+            },
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(response.context["analysis_completed"])
+        self.assertIn(
+            "The submitted request is too large. "
+            "Reduce the dataset sizes and try again.",
+            response.context["errors"],
+        )
+        self.assertContains(
+            response,
+            "The submitted request is too large.",
+            status_code=413,
+        )

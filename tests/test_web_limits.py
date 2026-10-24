@@ -1,3 +1,4 @@
+
 import json
 
 from django.test import TestCase, override_settings
@@ -74,7 +75,19 @@ class TraceInputLimitTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(response.context["analysis_completed"])
+        self.assertTrue(
+            any(
+                "The submitted request is too large." in error
+                for error in response.context["errors"]
+            )
+        )
+        self.assertContains(
+            response,
+            "The submitted request is too large.",
+            status_code=413,
+        )
 
     def test_malformed_json_returns_validation_message(self):
         response = self.client.post(

@@ -1,6 +1,7 @@
 
 import json
 
+from django.core.exceptions import RequestDataTooBig
 from django.shortcuts import render
 
 from causality.evidence_reporting import attach_evidence_reporting
@@ -107,8 +108,20 @@ def compare_traces(request):
     if request.method != "POST":
         return render(request, "causality/compare.html", context)
 
-    baseline_json = request.POST.get("baseline_json", "")
-    degraded_json = request.POST.get("degraded_json", "")
+    try:
+        baseline_json = request.POST.get("baseline_json", "")
+        degraded_json = request.POST.get("degraded_json", "")
+    except RequestDataTooBig:
+        context["errors"].append(
+            "The submitted request is too large. "
+            "Reduce the dataset sizes and try again."
+        )
+        return render(
+            request,
+            "causality/compare.html",
+            context,
+            status=413,
+        )
 
     context["baseline_json"] = baseline_json
     context["degraded_json"] = degraded_json
